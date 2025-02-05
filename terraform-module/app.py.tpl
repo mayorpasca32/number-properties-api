@@ -17,8 +17,8 @@ def is_prime(n):
 def is_perfect(n):
     if n < 1:
         return False
-    sum = 0
-    for i in range(1, abs(n)):  # Handle negative numbers in perfect check
-        if n % i == 0:
-            sum += i
-    return sum == abs
+    sum_of_divisors = 0  # More descriptive variable name
+    for i in range(1, abs(n)):  # Iterate from 1 up to (but not including) the number itself
+        if abs(n) % i == 0:  # Use abs(n) to handle negative input
+            sum_of_divisors += i
+    return sum_of_divisors == abs(n)  # Correct comparison
