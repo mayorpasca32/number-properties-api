@@ -1,6 +1,6 @@
 # provider.tf
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
   profile = "default"
 }
 
@@ -10,10 +10,14 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 }
 
-# variables.tf
+# variables
 variable "aws_region" {
   description = "AWS region to deploy to"
   type        = string
@@ -24,6 +28,32 @@ variable "app_name" {
   description = "Name of the application"
   type        = string
   default     = "number-properties-api"
+}
+
+variable "key_name" {
+  description = "Name of the key pair"
+  type        = string
+  default     = "number-api-key"
+}
+
+# Key Pair Resources
+resource "tls_private_key" "ssh" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "aws_key_pair" "generated_key" {
+  key_name   = var.key_name
+  public_key = tls_private_key.ssh.public_key_openssh
+}
+
+resource "aws_secretsmanager_secret" "private_key" {
+  name = "${var.app_name}-ssh-private-key"
+}
+
+resource "aws_secretsmanager_secret_version" "private_key" {
+  secret_id     = aws_secretsmanager_secret.private_key.id
+  secret_string = tls_private_key.ssh.private_key_pem
 }
 
 # Latest Amazon Linux 2 AMI
@@ -134,108 +164,33 @@ resource "aws_instance" "app" {
   instance_type          = "t2.micro"
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.app.id]
+  key_name              = aws_key_pair.generated_key.key_name
 
   user_data = <<-EOF
               #!/bin/bash
               exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
-              
+
               # Update and install dependencies
               yum update -y
               yum install -y python3 python3-pip git
-              
+
               # Install Python packages
               pip3 install flask flask-cors requests
-              
+
               # Create app directory and application
               mkdir -p /app
-              cat <<'EOT' > /app/app.py
-              from flask import Flask, request, jsonify
-              from flask_cors import CORS
-              import math
-              import requests
-              
-              app = Flask(__name__)
-              CORS(app)
-              
-              def is_prime(n):
-                  if n < 2:
-                      return False
-                  for i in range(2, int(math.sqrt(n)) + 1):
-                      if n % i == 0:
-                          return False
-                  return True
-              
-              def is_perfect(n):
-                  if n < 1:
-                      return False
-                  sum = 0
-                  for i in range(1, n):
-                      if n % i == 0:
-                          sum += i
-                  return sum == n
-              
-              def is_armstrong(n):
-                  num_str = str(n)
-                  power = len(num_str)
-                  return n == sum(int(digit) ** power for digit in num_str)
-              
-              def get_properties(n):
-                  properties = []
-                  if is_armstrong(n):
-                      properties.append("armstrong")
-                  if n % 2 == 0:
-                      properties.append("even")
-                  else:
-                      properties.append("odd")
-                  return properties
-              
-              def get_digit_sum(n):
-                  return sum(int(digit) for digit in str(n))
-              
-              def get_fun_fact(n):
-                  try:
-                      response = requests.get(f"http://numbersapi.com/{n}/math")
-                      return response.text
-                  except:
-                      if is_armstrong(n):
-                          digits = str(n)
-                          power = len(digits)
-                          return f"{n} is an Armstrong number because " + " + ".join(f"{d}^{power}" for d in digits) + f" = {n}"
-                      return f"The number {n} has {len(str(n))} digits"
-              
-              @app.route('/api/classify-number', methods=['GET'])
-              def classify_number():
-                  try:
-                      number = request.args.get('number')
-                      if not number:
-                          return jsonify({"number": None, "error": True}), 400
-                      
-                      number = int(number)
-                      
-                      response = {
-                          "number": number,
-                          "is_prime": is_prime(number),
-                          "is_perfect": is_perfect(number),
-                          "properties": get_properties(number),
-                          "digit_sum": get_digit_sum(number),
-                          "fun_fact": get_fun_fact(number)
-                      }
-                      
-                      return jsonify(response), 200
-                  
-                  except ValueError:
-                      return jsonify({"number": request.args.get('number'), "error": True}), 400
-              
-              if __name__ == '__main__':
-                  app.run(host='0.0.0.0', port=8080)
+
+              # Use a template file for app.py
+              cat <<EOT > /app/app.py
+              ${templatefile("app.py.tpl", {})} # Use template file
               EOT
-              
+
               # Create service file
               cat <<'EOT' > /etc/systemd/system/api.service
               [Unit]
               Description=Number Properties API
               After=network.target
-              
+
               [Service]
               User=root
               WorkingDirectory=/app
@@ -243,17 +198,17 @@ resource "aws_instance" "app" {
               Restart=always
               StandardOutput=append:/var/log/api.log
               StandardError=append:/var/log/api.error.log
-              
+
               [Install]
               WantedBy=multi-user.target
               EOT
-              
+
               # Set permissions and start service
               chmod 644 /etc/systemd/system/api.service
               systemctl daemon-reload
               systemctl enable api
               systemctl start api
-              
+
               # Create a status check file
               echo "API setup complete" > /tmp/setup_complete
               EOF
@@ -272,4 +227,15 @@ output "api_url" {
 output "instance_id" {
   description = "EC2 instance ID"
   value       = aws_instance.app.id
+}
+
+output "private_key" {
+  description = "Private key for SSH access (sensitive)"
+  value       = tls_private_key.ssh.private_key_pem
+  sensitive   = true
+}
+
+output "ssh_command" {
+  description = "SSH command to connect to the instance"
+  value       = "ssh -i private_key.pem ec2-user@${aws_instance.app.public_ip}"
 }
