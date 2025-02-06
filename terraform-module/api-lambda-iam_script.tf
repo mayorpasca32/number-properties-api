@@ -48,7 +48,7 @@ resource "aws_key_pair" "generated_key" {
 }
 
 resource "aws_secretsmanager_secret" "private_key" {
-  name = "${var.app_name}-ssh-private-key"
+  name = "${var.app_name}-ma-ssh-private-key"
 }
 
 resource "aws_secretsmanager_secret_version" "private_key" {
@@ -131,11 +131,12 @@ resource "aws_security_group" "app" {
 
   ingress {
     protocol    = "tcp"
-    from_port   = 8080
-    to_port     = 8080
+    from_port   = 5001
+    to_port     = 5001
     cidr_blocks = ["0.0.0.0/0"]
     description = "API port"
   }
+
 
   ingress {
     protocol    = "tcp"
@@ -221,7 +222,7 @@ resource "aws_instance" "app" {
 # Outputs
 output "api_url" {
   description = "URL of the API"
-  value       = "http://${aws_instance.app.public_ip}:8080"
+  value       = "http://${aws_instance.app.public_ip}:5001"
 }
 
 output "instance_id" {
