@@ -32,11 +32,11 @@ def is_perfect(n):
     return sum_of_divisors == abs_n  # Compare with original float/int
 
 def is_armstrong(n):
-  try:
+    try:
       num_str = str(abs(int(n)))
       power = len(num_str)
       return abs(int(n)) == sum(int(digit) ** power for digit in num_str)
-  except ValueError:
+    except ValueError:
       return False
 
 def get_properties(n):
@@ -60,14 +60,14 @@ def get_digit_sum(n):
 def get_fun_fact(n):
     try:
         response = requests.get(f"http://numbersapi.com/{n}/math")
-        response.raise_for_status()
+        response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
         return response.text
-    except requests.exceptions.RequestException:
+    except requests.exceptions.RequestException as e:
         if is_armstrong(n):
             digits = str(abs(int(n)))
             power = len(digits)
             return f"{n} is an Armstrong number because " + " + ".join(f"{d}^{power}" for d in digits) + f" = {abs(int(n))}"
-        return f"The number {n} has {len(str(abs(n)))} digits"
+        return f"Error fetching fun fact for {n}: {e}"  # More informative message
 
 
 @app.route('/api/classify-number', methods=['GET'])
@@ -88,7 +88,7 @@ def classify_number():
 
     try:
         response = {
-            "number": number,
+ 	    "number": number,
             "is_prime": is_prime(number),
             "is_perfect": is_perfect(number),
             "properties": get_properties(number),
@@ -103,6 +103,5 @@ def classify_number():
         return jsonify({"error": True, "message": str(e)}), 500
 
 
-if __name__ == '__main__':
-    print("Flask application starting...")
-    app.run(host='0.0.0.0', port=5001, debug=True)
+print("Flask application starting...")
+app.run(host='0.0.0.0', port=5001, debug=True)  # debug=True is for development ONLY
