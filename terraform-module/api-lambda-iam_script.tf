@@ -48,7 +48,7 @@ resource "aws_key_pair" "generated_key" {
 }
 
 resource "aws_secretsmanager_secret" "private_key" {
-  name = "${var.app_name}-ma-ssh-private-key"
+  name = "${var.app_name}-pasca-ssh-private-key"
 }
 
 resource "aws_secretsmanager_secret_version" "private_key" {
