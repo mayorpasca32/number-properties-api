@@ -1,100 +1,124 @@
-#Mayor's Number Classifier API
+Mayor's Number Properties API
+A simple REST API that returns mathematical properties and fun facts about numbers. The project is deployed on AWS using Terraform for infrastructure as code (IaC) and Python (Flask) for the API.
 
-This project deploys a serverless API on AWS using Lambda, API Gateway, and IAM. The API classifies numbers (e.g., identifying perfect, Armstrong, or prime numbers) based on user input. The infrastructure and deployment are automated using a Python script powered by Boto3.
-
-Features
-Classify Numbers: Determine if a number is perfect, Armstrong, or prime.
-Public API: Accessible over the internet via an HTTP endpoint.
-Serverless Architecture: Deployed using AWS Lambda and API Gateway for scalability.
-Automated Deployment: Provisioning of AWS resources (IAM, Lambda, API Gateway) with a single Python script.
-
-Project Structure
+🛠️ Tech Stack
+Python (Flask) - API implementation
+Terraform - Infrastructure as Code (IaC)
+AWS - Cloud hosting (EC2, IAM, S3, etc.)
+📌 Features
+Retrieve properties like prime, even/odd, Fibonacci, and factorial for any number
+Supports CORS for cross-origin requests
+Deployed using Systemd for process management
+📁 Project Structure
 bash
 Copy
 Edit
-├── lambda_code/
-│   └── lambda_function.py       # Lambda function logic
-├── task1-boto3.py               # Deployment script using Boto3
-├── README.md                    # Project documentation
-└── requirements.txt             # Python dependencies
+/number-properties-api
+│── terraform/                   # Terraform configurations for AWS infrastructure
+│── app/                          # Python API source code
+│   ├── app.py                    # Main Flask application
+│   ├── requirements.txt           # Python dependencies
+│   ├── config.py                  # Configuration settings
+│   ├── services/                  # Logic for number properties
+│   ├── .venv/                     # Python virtual environment (excluded from repo)
+│── README.md                       # Project documentation
+│── api.service                     # Systemd service definition
+│── main.tf                         # Terraform main configuration
 
-Prerequisites
-AWS CLI configured with credentials
-Python 3.6+ installed
-Boto3 Library (pip install boto3)
-AWS permissions to create IAM roles, Lambda functions, and API Gateway resources
+🚀 Getting Started
+1️⃣ Prerequisites
+Python 3.7+ installed
+Terraform installed
+AWS CLI configured (aws configure)
+An AWS IAM user with EC2 & S3 permissions
 
-Installation
-Clone the Repository:
+2️⃣ Clone the Repository
+bash
+Copy
+Edit
+git clone https://github.com/mayorpasca32/number-properties-api.git
+cd number-properties-api
+
+3️⃣ Deploy Infrastructure with Terraform
+Navigate to the Terraform directory:
 
 bash
 Copy
 Edit
-git clone https://github.com/your-repo/number-classifier-api.git
-cd number-classifier-api
-Install Dependencies:
+cd terraform
+terraform init
+terraform apply -auto-approve
+Terraform will: ✅ Create an EC2 instance for the API
+✅ Set up IAM roles and security groups
+✅ Provision an S3 bucket (if needed)
+
+4️⃣ Deploy the API
+SSH into the EC2 instance and set up the API:
 
 bash
 Copy
 Edit
+ssh -i your-key.pem ec2-user@your-ec2-instance
+🔹 Install Dependencies
+bash
+Copy
+Edit
+sudo yum install -y python3 python3-venv
+cd /app
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+🔹 Start the API
+bash
+Copy
+Edit
+python app.py
+The API should now be running at http://localhost:5000
 
-Deployment Steps
-Run the Deployment Script:
+5️⃣ Set Up Systemd for Auto-Restart
+To run the API as a system service:
 
 bash
 Copy
 Edit
-python3 task1-boto3.py
-Output:
-After successful deployment, you’ll receive the public API URL similar to:
+sudo cp api.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable api.service
+sudo systemctl start api.service
+Check status:
 
-php-template
-Copy
-Edit
-https://<api-id>.execute-api.<region>.amazonaws.com/prod/api/classify-number
-
-API Usage
-Endpoint:
-typescript
-Copy
-Edit
-GET /api/classify-number?number=<value>
-Example Request:
 bash
 Copy
 Edit
-curl "https://<api-id>.execute-api.<region>.amazonaws.com/prod/api/classify-number?number=371"
-Sample Response:
+sudo systemctl status api.service
+🔄 API Endpoints
+GET /api/number/{n}
+Retrieve number properties
+📌 Example:
+
+bash
+Copy
+Edit
+curl http://your-api-url/api/number/7
+📌 Response:
+
 json
 Copy
 Edit
 {
-  "number": 371,
-  "is_armstrong": true,
-  "is_perfect": false,
-  "is_prime": false
+  "number": 7,
+  "is_prime": true,
+  "is_fibonacci": false,
+  "factorial": 5040
 }
-
-Error Handling:
-Invalid Input:
-json
+🛠️ Troubleshooting
+1️⃣ Check API Logs
+bash
 Copy
 Edit
-{
-  "error": "Invalid input. Please provide a valid number."
-}
-
-HTTP Status Codes:
-200 OK → For valid requests
-400 Bad Request → For invalid inputs
-
-Security Configuration
-IAM Role: Grants Lambda permission to execute
-API Gateway: Configured to allow public access
-Lambda Permissions: Adjusted using Boto3 to integrate securely with API Gateway
-
-Troubleshooting
-403 Errors: Ensure the Lambda function has the correct resource-based policy to allow API Gateway invocation.
-Connection Issues: Verify that the API Gateway is deployed and the endpoint is enabled for public access.
-Timeouts: Check Lambda's timeout settings and API Gateway resource configuration.
+journalctl -u api.service -n 50 --no-pager
+2️⃣ Restart the Service
+bash
+Copy
+Edit
+sudo systemctl restart api.service
